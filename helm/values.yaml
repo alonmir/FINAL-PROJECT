@@ -1,0 +1,29 @@
+image:
+  repository: 843170960179.dkr.ecr.eu-central-1.amazonaws.com/devops-alon-app
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: NodePort
+  port: 8000
+  nodePort: 30080
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "300m"
+    memory: "256Mi"
+
+probes:
+  path: "/"
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+

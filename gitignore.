@@ -1,0 +1,11 @@
+# Terraform State and Caching
+.terraform/*
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# IDE specific files
+.DS_Store
+
+# Nested Git modules
+**/modules/*/.git/
