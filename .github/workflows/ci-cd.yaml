@@ -3,12 +3,12 @@ name: CI/CD Pipeline to EKS
 on:
   push:
     branches:
-      - main
+      - main  # הפעלת Workflow בעת דחיפה לענף הראשי
 
 env:
   # משתנים בסיסיים
   AWS_REGION: eu-central-1
-  AWS_ACCOUNT_ID: 843170960179 # הוספנו את המזהה כמשתנה נפרד
+  AWS_ACCOUNT_ID: 843170960179 
   ECR_REPOSITORY: devops-alon-app 
   EKS_CLUSTER_NAME: devops-alon-eks 
   IMAGE_TAG: ${{ github.sha }} 
@@ -17,6 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
+    # הוספת הרשאות ה-Job (פותר בעיות הרשאה עם PAT)
     permissions:
       id-token: write
       contents: read
@@ -37,7 +38,7 @@ jobs:
         
       # שלב א': בנייה ודחיפה של Docker Image
       - name: 4. Build and push Docker image
-        # כאן אנחנו בונים את ה-URL המלא בתוך בלוק run, שם זה מותר
+        # בניית ה-URL המלא בצורה בטוחה בתוך בלוק run
         env:
           ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
@@ -49,7 +50,8 @@ jobs:
 
       # שלב ב': פריסה ל-EKS באמצעות Helm
       - name: 5. Set up EKS context
-        uses: aws-actions/eks-set-context@v2
+        # תיקון קריטי: שימוש בגרסה v4 ל-EKS set context
+        uses: aws-actions/eks-set-context@v4
         with:
           cluster-name: ${{ env.EKS_CLUSTER_NAME }} 
           aws-region: ${{ env.AWS_REGION }}
@@ -60,7 +62,7 @@ jobs:
           sudo apt-get install -y helm
 
       - name: 7. Deploy application with Helm
-        # כאן אנחנו בונים שוב את כתובת ה-Registry המלאה בצורה מאובטחת
+        # בניית כתובת ה-Registry המלאה לצורך פריסת Helm
         env:
           ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
