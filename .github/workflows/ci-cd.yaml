@@ -17,7 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    # הוספת הרשאות ה-Job (פותר בעיות הרשאה עם PAT)
+    # הוספת הרשאות ה-Job (פתרון בעיות הרשאה עם PAT)
     permissions:
       id-token: write
       contents: read
@@ -50,8 +50,8 @@ jobs:
 
       # שלב ב': פריסה ל-EKS באמצעות Helm
       - name: 5. Set up EKS context
-        # תיקון קריטי: שימוש בגרסה v4 ל-EKS set context
-        uses: aws-actions/eks-set-context@v4
+        # תיקון קריטי: שימוש בגרסה v1 (היציבה) 
+        uses: aws-actions/eks-set-context@v1
         with:
           cluster-name: ${{ env.EKS_CLUSTER_NAME }} 
           aws-region: ${{ env.AWS_REGION }}
