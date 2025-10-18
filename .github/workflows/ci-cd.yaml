@@ -3,24 +3,20 @@ name: CI/CD Pipeline to EKS
 on:
   push:
     branches:
-      - main  # הפעלת Workflow בעת דחיפה לענף הראשי
+      - main
 
 env:
   # משתנים בסיסיים
   AWS_REGION: eu-central-1
+  AWS_ACCOUNT_ID: 843170960179 # הוספנו את המזהה כמשתנה נפרד
   ECR_REPOSITORY: devops-alon-app 
   EKS_CLUSTER_NAME: devops-alon-eks 
   IMAGE_TAG: ${{ github.sha }} 
-
-  # תיקון שגיאת env: שימוש בפונקציה format() לבניית ה-URL המלא
-  # הפורמט: {account_id}.dkr.ecr.{aws_region}.amazonaws.com
-  ECR_REGISTRY: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com', '843170960179', env.AWS_REGION) }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    # הגדרת הרשאות ה-Job כדי לאפשר שינוי של EKS
     permissions:
       id-token: write
       contents: read
@@ -32,23 +28,26 @@ jobs:
       - name: 2. Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # שימוש ב-Secrets שהגדרת ב-GitHub
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} 
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 3. Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
-
+        
+      # שלב א': בנייה ודחיפה של Docker Image
       - name: 4. Build and push Docker image
+        # כאן אנחנו בונים את ה-URL המלא בתוך בלוק run, שם זה מותר
         env:
-          # יצירת ה-URL המלא לאימג' לצורך Build/Push
-          IMAGE_FULL_URL: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
-          # הפקודות מתבצעות בתיקיית הבסיס, לכן ה-Dockerfile ימצא
+          IMAGE_FULL_URL="${ECR_REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+          
+          echo "Building and pushing image: $IMAGE_FULL_URL"
           docker build -t $IMAGE_FULL_URL .
           docker push $IMAGE_FULL_URL
 
+      # שלב ב': פריסה ל-EKS באמצעות Helm
       - name: 5. Set up EKS context
         uses: aws-actions/eks-set-context@v2
         with:
@@ -56,14 +55,15 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 6. Install dependencies (Helm)
-        # התקנת Helm על שרת ה-GitHub Actions
         run: |
           sudo apt-get update
           sudo apt-get install -y helm
 
       - name: 7. Deploy application with Helm
+        # כאן אנחנו בונים שוב את כתובת ה-Registry המלאה בצורה מאובטחת
+        env:
+          ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
-          # הרצת Helm upgrade/install עם ה-repository וה-tag החדשים
           helm upgrade --install alon-app ./helm \
             --set image.tag=${{ env.IMAGE_TAG }} \
-            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+            --set image.repository=${ECR_REGISTRY}/${{ env.ECR_REPOSITORY }}
