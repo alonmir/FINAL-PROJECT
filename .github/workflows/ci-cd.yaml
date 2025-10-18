@@ -49,12 +49,10 @@ jobs:
           docker push $IMAGE_FULL_URL
 
       # שלב ב': פריסה ל-EKS באמצעות Helm
-      - name: 5. Set up EKS context
-        # תיקון קריטי: שימוש בגרסה v1 (היציבה) 
-        uses: aws-actions/eks-set-context@v1
-        with:
-          cluster-name: ${{ env.EKS_CLUSTER_NAME }} 
-          aws-region: ${{ env.AWS_REGION }}
+      - name: 5. Set up Kubeconfig (שימוש בכלי CLI במקום Action)
+        # פתרון הבעיה: שימוש בפקודת AWS CLI ישירה במקום Action תקוע
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
       - name: 6. Install dependencies (Helm)
         run: |
