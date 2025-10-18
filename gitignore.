@@ -1,11 +1,21 @@
 # Terraform State and Caching
-.terraform/*
-*.tfstate
-*.tfstate.*
+# כל תיקיית הניהול של Terraform שבה יושבים הספקים הענקיים
+.terraform/
 .terraform.lock.hcl
 
-# IDE specific files
-.DS_Store
+# קבצי ה-State החיוניים לניהול מצב התשתית (אבל מנוהלים ב-S3, אז לא צריך לדחוף אותם)
+*.tfstate
+*.tfstate.*
 
-# Nested Git modules
-**/modules/*/.git/
+# קבצים שנוצרים לאחר הרצה
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# מערכת הפעלה ו-IDE
+.DS_Store
+*~
