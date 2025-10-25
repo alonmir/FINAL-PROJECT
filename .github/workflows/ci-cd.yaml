@@ -2,68 +2,75 @@ name: CI/CD Pipeline to EKS
 
 on:
   push:
-    branches:
-      - main  # הפעלת Workflow בעת דחיפה לענף הראשי
+    branches: [ "main" ]
+  workflow_dispatch:
 
 env:
-  # משתנים בסיסיים
   AWS_REGION: eu-central-1
-  AWS_ACCOUNT_ID: 843170960179 
-  ECR_REPOSITORY: devops-alon-app 
-  EKS_CLUSTER_NAME: devops-alon-eks 
-  IMAGE_TAG: ${{ github.sha }} 
+  AWS_ACCOUNT_ID: 843170960179
+  ECR_REPOSITORY: devops-alon-app
+  EKS_CLUSTER_NAME: devops-alon           # <<< עדכן אם צריך
+  IMAGE_TAG: ${{ github.sha }}
+  DOCKER_CONTEXT: app                      # <<< אם Dockerfile בשורש: "."
+  DOCKERFILE: app/Dockerfile               # <<< אם בשורש: "Dockerfile"
+  HELM_CHART_PATH: helm/devops-alon        # <<< נתיב הצ'ארט המדויק
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
-    # הוספת הרשאות ה-Job (פתרון בעיות הרשאה עם PAT)
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: 1. Checkout code
+      - name: 1) Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Configure AWS Credentials
+      - name: 2) Configure AWS credentials (using secrets)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 3. Login to Amazon ECR
+      - name: 3) Login to Amazon ECR
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
-        
-      # שלב א': בנייה ודחיפה של Docker Image
-      - name: 4. Build and push Docker image
-        # בניית ה-URL המלא בצורה בטוחה בתוך בלוק run
-        env:
-          ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-        run: |
-          IMAGE_FULL_URL="${ECR_REGISTRY}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
-          
-          echo "Building and pushing image: $IMAGE_FULL_URL"
-          docker build -t "$IMAGE_FULL_URL" app/Dockerfile app
-          docker push $IMAGE_FULL_URL
 
-      # שלב ב': פריסה ל-EKS באמצעות Helm
-      - name: 5. Set up Kubeconfig (שימוש בכלי CLI במקום Action)
-        # פתרון הבעיה: שימוש בפקודת AWS CLI ישירה במקום Action תקוע
-        run: |
-          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      - name: 4) Set up Docker Buildx (optional but safe)
+        uses: docker/setup-buildx-action@v3
 
-      - name: 6. Install dependencies (Helm)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y helm
+      - name: 5) Build & Push image to ECR
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.DOCKER_CONTEXT }}
+          file: ${{ env.DOCKERFILE }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: 7. Deploy application with Helm
-        # בניית כתובת ה-Registry המלאה לצורך פריסת Helm
-        env:
-          ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+      - name: 6) Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: 7) Update kubeconfig
         run: |
-          helm upgrade --install alon-app ./helm \
-            --set image.tag=${{ env.IMAGE_TAG }} \
-            --set image.repository=${ECR_REGISTRY}/${{ env.ECR_REPOSITORY }}
+          aws eks update-kubeconfig \
+            --name "${{ env.EKS_CLUSTER_NAME }}" \
+            --region "${{ env.AWS_REGION }}"
+
+      - name: 8) Helm upgrade/install (public LB)
+        run: |
+          helm upgrade --install alon-app "${{ env.HELM_CHART_PATH }}" \
+            --set image.repository="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" \
+            --set image.tag="${{ env.IMAGE_TAG }}" \
+            --set service.type=LoadBalancer
+
+      - name: 9) Wait & print external URL
+        run: |
+          kubectl rollout status deploy/alon-app --timeout=180s || true
+          echo "Service External Address:"
+          kubectl get svc alon-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}{"\n"}' || true
+          kubectl get pods,svc -o wide
+
