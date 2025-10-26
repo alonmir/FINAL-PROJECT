@@ -1,0 +1,34 @@
+image:
+  repository: 843170960179.dkr.ecr.eu-central-1.amazonaws.com/devops-alon-app
+
+# קונטיינר מאזין על 5000
+containerPort: 5000
+
+service:
+  type: LoadBalancer
+  port: 5000
+  targetPort: 5000
+  portName: web           # למנוע "Duplicate value: http"
+  additionalPorts: []     # מבטל פתיחת פורטים נוספים אם יש בצ'ארט
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 5000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 6
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 5000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 6
+
+metrics:
+  enabled: false          # אם לצ'ארט יש מטריקס – מבטל, כדי שלא יווצר פורט נוסף
+
