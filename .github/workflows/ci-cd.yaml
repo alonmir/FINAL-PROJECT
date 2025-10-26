@@ -14,8 +14,8 @@ env:
   BUILD_CONTEXT: ./app
   DOCKERFILE_PATH: ./app/Dockerfile
   HELM_CHART_PATH: ./helm
-  KUBE_NAMESPACE: default          # אפשר לשנות ל-devops-alon אם תרצה
-  APP_PORT: 5000                   # אם האפליקציה מאזינה לפורט אחר – עדכן כאן
+  KUBE_NAMESPACE: default
+  APP_PORT: 5000
 
 jobs:
   deploy:
@@ -23,6 +23,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
     steps:
       - name: 1) Checkout
         uses: actions/checkout@v4
@@ -77,14 +78,12 @@ jobs:
             --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
             --access-scope type=cluster \
             --region "${{ env.AWS_REGION }}" || true
-          aws eks describe-access-entry \
-            --cluster-name "${{ env.EKS_CLUSTER_NAME }}" \
-            --principal-arn "$PRINCIPAL_ARN" \
-            --region "${{ env.AWS_REGION }}" --query accessEntry
-          kubectl get nodes || true
 
       - name: 8) Helm upgrade/install (public LB, wait for readiness)
         run: |
+          # ניקוי Service כדי למנוע התנגשויות סכימה (לא יקרוס אם לא קיים)
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" delete svc alon-app --ignore-not-found=true
+
           helm upgrade --install alon-app "${{ env.HELM_CHART_PATH }}" \
             --namespace "${{ env.KUBE_NAMESPACE }}" --create-namespace \
             --set fullnameOverride=alon-app \
@@ -92,17 +91,24 @@ jobs:
             --set image.tag="${{ env.IMAGE_TAG }}" \
             --set service.type=LoadBalancer \
             --set service.port=${{ env.APP_PORT }} \
+            --set service.targetPort=${{ env.APP_PORT }} \
+            --set service.portName=web \
             --set containerPort=${{ env.APP_PORT }} \
             --set readinessProbe.httpGet.path=/ \
             --set readinessProbe.httpGet.port=${{ env.APP_PORT }} \
             --set livenessProbe.httpGet.path=/ \
             --set livenessProbe.httpGet.port=${{ env.APP_PORT }} \
+            --set-json 'service.additionalPorts=[]' \
+            --set metrics.enabled=false \
             --wait --timeout=180s
 
       - name: 9) Print status & external address
         run: |
-          kubectl -n "${{ env.KUBE_NAMESPACE }}" rollout status deploy/alon-app --timeout=180s
-          echo "Service External Address:"
-          kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc alon-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}{"\n"}' || true
-          kubectl -n "${{ env.KUBE_NAMESPACE }}" get pods,svc -o wide
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get deploy/alon-app
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc/alon-app -o wide
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get endpoints alon-app -o wide || true
+          echo "External URL:"
+          H=$(kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc alon-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'); \
+          P=$(kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc alon-app -o jsonpath='{.spec.ports[0].port}'); \
+          echo "http://$H:$P/"
 
