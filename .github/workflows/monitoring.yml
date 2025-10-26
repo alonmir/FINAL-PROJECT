@@ -1,0 +1,50 @@
+name: Install Monitoring (Prometheus+Grafana)
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-central-1
+  EKS_CLUSTER_NAME: devops-alon-eks
+  KUBE_NAMESPACE: monitoring
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Add Helm repo & update
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Install/Upgrade kube-prometheus-stack (Grafana as LoadBalancer)
+        run: |
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            --namespace "${{ env.KUBE_NAMESPACE }}" --create-namespace \
+            --set grafana.service.type=LoadBalancer \
+            --set grafana.service.port=80
+
+      - name: Print Grafana URL & admin password
+        run: |
+          echo "Grafana URL:"
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc monitoring-grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}' || true
+          echo "Admin password:"
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get secret monitoring-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo || true
+
