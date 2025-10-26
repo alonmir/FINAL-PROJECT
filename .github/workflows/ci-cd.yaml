@@ -9,11 +9,11 @@ env:
   AWS_REGION: eu-central-1
   AWS_ACCOUNT_ID: 843170960179
   ECR_REPOSITORY: devops-alon-app
-  EKS_CLUSTER_NAME: devops-alon           # <<< עדכן אם צריך
+  EKS_CLUSTER_NAME: devops-alon          # אם הקלאסטר שלך נקרא אחרת – עדכן כאן
   IMAGE_TAG: ${{ github.sha }}
-  DOCKER_CONTEXT: app                      # <<< אם Dockerfile בשורש: "."
-  DOCKERFILE: app/Dockerfile               # <<< אם בשורש: "Dockerfile"
-  HELM_CHART_PATH: helm/devops-alon        # <<< נתיב הצ'ארט המדויק
+  BUILD_CONTEXT: ./app                   # אם ה-Dockerfile בשורש – שנה ל: .
+  DOCKERFILE_PATH: ./app/Dockerfile      # אם בשורש – שנה ל: Dockerfile
+  HELM_CHART_PATH: helm/devops-alon      # אם הצ'ארט יושב ישירות ב-./helm – שנה ל: ./helm
 
 jobs:
   deploy:
@@ -26,7 +26,7 @@ jobs:
       - name: 1) Checkout
         uses: actions/checkout@v4
 
-      - name: 2) Configure AWS credentials (using secrets)
+      - name: 2) Configure AWS credentials (secrets)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -34,20 +34,20 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 3) Login to Amazon ECR
-        id: ecr
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 4) Set up Docker Buildx (optional but safe)
+      - name: 4) Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: 5) Build & Push image to ECR
         uses: docker/build-push-action@v5
         with:
-          context: ${{ env.DOCKER_CONTEXT }}
-          file: ${{ env.DOCKERFILE }}
+          context: ${{ env.BUILD_CONTEXT }}          # ← ה-context שלא היה אצלך
+          file: ${{ env.DOCKERFILE_PATH }}
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -63,11 +63,11 @@ jobs:
       - name: 8) Helm upgrade/install (public LB)
         run: |
           helm upgrade --install alon-app "${{ env.HELM_CHART_PATH }}" \
-            --set image.repository="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" \
+            --set image.repository="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" \
             --set image.tag="${{ env.IMAGE_TAG }}" \
             --set service.type=LoadBalancer
 
-      - name: 9) Wait & print external URL
+      - name: 9) Print status & external address
         run: |
           kubectl rollout status deploy/alon-app --timeout=180s || true
           echo "Service External Address:"
