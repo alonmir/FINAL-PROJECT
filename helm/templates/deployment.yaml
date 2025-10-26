@@ -1,45 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "devops-alon.fullname" . }}
+  name: alon-app
   labels:
-    app.kubernetes.io/name: {{ include "devops-alon.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: alon-app
+    app.kubernetes.io/instance: alon-app
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "devops-alon.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: alon-app
+      app.kubernetes.io/instance: alon-app
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "devops-alon.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: alon-app
+        app.kubernetes.io/instance: alon-app
     spec:
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - containerPort: 8000
-          readinessProbe:
-            httpGet:
-              path: {{ .Values.probes.path }}
-              port: 8000
-            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
-          livenessProbe:
-            httpGet:
-              path: {{ .Values.probes.path }}
-              port: 8000
-            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
-          resources:
-            requests:
-              cpu: {{ .Values.resources.requests.cpu }}
-              memory: {{ .Values.resources.requests.memory }}
-            limits:
-              cpu: {{ .Values.resources.limits.cpu }}
-              memory: {{ .Values.resources.limits.memory }}
+            - containerPort: {{ .Values.containerPort }}
+          readinessProbe: {{- toYaml .Values.readinessProbe | nindent 12 }}
+          livenessProbe:  {{- toYaml .Values.livenessProbe  | nindent 12 }}
 
