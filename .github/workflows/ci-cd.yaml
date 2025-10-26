@@ -14,6 +14,8 @@ env:
   BUILD_CONTEXT: ./app
   DOCKERFILE_PATH: ./app/Dockerfile
   HELM_CHART_PATH: ./helm
+  KUBE_NAMESPACE: default          # אפשר לשנות ל-devops-alon אם תרצה
+  APP_PORT: 8000                   # אם האפליקציה מאזינה לפורט אחר – עדכן כאן
 
 jobs:
   deploy:
@@ -81,17 +83,26 @@ jobs:
             --region "${{ env.AWS_REGION }}" --query accessEntry
           kubectl get nodes || true
 
-      - name: 8) Helm upgrade/install (public LB)
+      - name: 8) Helm upgrade/install (public LB, wait for readiness)
         run: |
           helm upgrade --install alon-app "${{ env.HELM_CHART_PATH }}" \
+            --namespace "${{ env.KUBE_NAMESPACE }}" --create-namespace \
+            --set fullnameOverride=alon-app \
             --set image.repository="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" \
             --set image.tag="${{ env.IMAGE_TAG }}" \
-            --set service.type=LoadBalancer
+            --set service.type=LoadBalancer \
+            --set service.port=${{ env.APP_PORT }} \
+            --set containerPort=${{ env.APP_PORT }} \
+            --set readinessProbe.httpGet.path=/ \
+            --set readinessProbe.httpGet.port=${{ env.APP_PORT }} \
+            --set livenessProbe.httpGet.path=/ \
+            --set livenessProbe.httpGet.port=${{ env.APP_PORT }} \
+            --wait --timeout=180s
 
       - name: 9) Print status & external address
         run: |
-          kubectl rollout status deploy/alon-app --timeout=180s || true
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" rollout status deploy/alon-app --timeout=180s
           echo "Service External Address:"
-          kubectl get svc alon-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}{"\n"}' || true
-          kubectl get pods,svc -o wide
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get svc alon-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}{"\n"}' || true
+          kubectl -n "${{ env.KUBE_NAMESPACE }}" get pods,svc -o wide
 
