@@ -9,11 +9,11 @@ env:
   AWS_REGION: eu-central-1
   AWS_ACCOUNT_ID: 843170960179
   ECR_REPOSITORY: devops-alon-app
-  EKS_CLUSTER_NAME: devops-alon-eks          # אם הקלאסטר שלך נקרא אחרת – עדכן כאן
+  EKS_CLUSTER_NAME: devops-alon-eks
   IMAGE_TAG: ${{ github.sha }}
-  BUILD_CONTEXT: ./app                   # אם ה-Dockerfile בשורש – שנה ל: .
-  DOCKERFILE_PATH: ./app/Dockerfile      # אם בשורש – שנה ל: Dockerfile
-  HELM_CHART_PATH: helm/devops-alon      # אם הצ'ארט יושב ישירות ב-./helm – שנה ל: ./helm
+  BUILD_CONTEXT: ./app
+  DOCKERFILE_PATH: ./app/Dockerfile
+  HELM_CHART_PATH: helm/devops-alon
 
 jobs:
   deploy:
@@ -21,7 +21,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
     steps:
       - name: 1) Checkout
         uses: actions/checkout@v4
@@ -43,7 +42,7 @@ jobs:
       - name: 5) Build & Push image to ECR
         uses: docker/build-push-action@v5
         with:
-          context: ${{ env.BUILD_CONTEXT }}          # ← ה-context שלא היה אצלך
+          context: ${{ env.BUILD_CONTEXT }}
           file: ${{ env.DOCKERFILE_PATH }}
           platforms: linux/amd64
           push: true
@@ -59,6 +58,28 @@ jobs:
           aws eks update-kubeconfig \
             --name "${{ env.EKS_CLUSTER_NAME }}" \
             --region "${{ env.AWS_REGION }}"
+
+      - name: 7.1) Ensure this CI identity has EKS admin (idempotent)
+        run: |
+          set -e
+          PRINCIPAL_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          echo "CI principal: $PRINCIPAL_ARN"
+          aws eks create-access-entry \
+            --cluster-name "${{ env.EKS_CLUSTER_NAME }}" \
+            --principal-arn "$PRINCIPAL_ARN" \
+            --type STANDARD \
+            --region "${{ env.AWS_REGION }}" || true
+          aws eks associate-access-policy \
+            --cluster-name "${{ env.EKS_CLUSTER_NAME }}" \
+            --principal-arn "$PRINCIPAL_ARN" \
+            --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+            --access-scope type=cluster \
+            --region "${{ env.AWS_REGION }}" || true
+          aws eks describe-access-entry \
+            --cluster-name "${{ env.EKS_CLUSTER_NAME }}" \
+            --principal-arn "$PRINCIPAL_ARN" \
+            --region "${{ env.AWS_REGION }}" --query accessEntry
+          kubectl get nodes || true
 
       - name: 8) Helm upgrade/install (public LB)
         run: |
