@@ -1,12 +1,33 @@
-# Terraform
-**/.terraform/*
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Docker/Build
+dist/
+build/
+*.egg-info
+.DS_Store
+
+# Terraform (רק מתוך infra/)
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfstate.backup
+infra/.terraform.lock.hcl
+
+# Root state (לביטחון)
 *.tfstate
 *.tfstate.*
-crash.log
-crash.*.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-!.terraform.lock.hcl
 
+# Swap/IDE
+*.swp
+.vscode/
+.idea/
+
+# Node (אם יהיה)
+node_modules/
+
+# מקומי
+Targets/

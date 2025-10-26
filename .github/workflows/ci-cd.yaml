@@ -13,7 +13,7 @@ env:
   IMAGE_TAG: ${{ github.sha }}
   BUILD_CONTEXT: ./app
   DOCKERFILE_PATH: ./app/Dockerfile
-  HELM_CHART_PATH: ./helm
+  HELM_CHART_PATH: ./deploy/helm/alon-app
   KUBE_NAMESPACE: default
   APP_PORT: 5000
 
