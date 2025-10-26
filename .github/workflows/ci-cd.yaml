@@ -15,7 +15,7 @@ env:
   DOCKERFILE_PATH: ./app/Dockerfile
   HELM_CHART_PATH: ./helm
   KUBE_NAMESPACE: default          # אפשר לשנות ל-devops-alon אם תרצה
-  APP_PORT: 8000                   # אם האפליקציה מאזינה לפורט אחר – עדכן כאן
+  APP_PORT: 5000                   # אם האפליקציה מאזינה לפורט אחר – עדכן כאן
 
 jobs:
   deploy:
