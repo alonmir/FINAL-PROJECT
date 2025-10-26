@@ -8,8 +8,8 @@ on:
 env:
   AWS_REGION: eu-central-1
   AWS_ACCOUNT_ID: 843170960179
-  ECR_REPOSITORY: devops-alon-app
-  EKS_CLUSTER_NAME: devops-alon          # אם הקלאסטר שלך נקרא אחרת – עדכן כאן
+  ECR_REPOSITORY: devops-alon
+  EKS_CLUSTER_NAME: devops-alon-eks          # אם הקלאסטר שלך נקרא אחרת – עדכן כאן
   IMAGE_TAG: ${{ github.sha }}
   BUILD_CONTEXT: ./app                   # אם ה-Dockerfile בשורש – שנה ל: .
   DOCKERFILE_PATH: ./app/Dockerfile      # אם בשורש – שנה ל: Dockerfile
