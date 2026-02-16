@@ -1,55 +1,30 @@
-# DevOps Assignment – EKS + Helm + CI/CD
+# 🚀 AWS EKS End-to-End DevOps Pipeline
 
-אפליקציית Flask מינימלית שרצה ב-**Gunicorn** (פורט `5000`), נארזת ל-**Docker**, נדחפת ל-**ECR**, ונפרסת ל-**EKS** בעזרת **Helm** דרך **GitHub Actions**. ניטור בסיסי באמצעות **kube-prometheus-stack** (Prometheus + Grafana).
+## 📌 Project Overview
+A production-ready implementation of a containerized Flask application on AWS EKS. This project automates the entire lifecycle from infrastructure provisioning to application monitoring.
 
----
+## 🏗️ Architecture
+* [cite_start]**IaC (Terraform):** Custom VPC with Public/Private subnets, S3 Backend for state management with DynamoDB locking[cite: 13, 15].
+* [cite_start]**Containerization:** Flask app built with a secure `python-slim` base and Gunicorn for Production performance[cite: 32, 53].
+* [cite_start]**CI/CD:** Automated GitHub Actions pipeline for ECR image push and EKS Helm deployment[cite: 40, 41, 42].
+* [cite_start]**Observability:** Prometheus & Grafana stack for cluster health (Bonus)[cite: 57].
 
-## תוכן העניינים
-- [סקירה](#סקירה)
-- [דרישות מוקדמות](#דרישות-מוקדמות)
-- [איך מריצים מקומית](#איך-מריצים-מקומית)
-- [דפלוי אוטומטי (CI/CD)](#דפלוי-אוטומטי-cicd)
-- [דפלוי ידני (Helm)](#דפלוי-ידני-helm)
-- [ניטור (Grafana/Prometheus)](#ניטור-grafanaprometheus)
-- [מבנה הרפו](#מבנה-הרפו)
-- [קונפיגורציה](#קונפיגורציה)
-- [ניפוי תקלות נפוצות](#ניפוי-תקלות-נפוצות)
-- [ניקוי סביבה / Destroy](#ניקוי-סביבה--destroy)
+## 🛠️ Components
+### 1. Infrastructure (`/infra`)
+To deploy the AWS environment:
+1. [cite_start]`terraform init` (Initializes S3 backend [cite: 13]).
+2. `terraform apply` - provisions VPC, EKS Cluster, and ECR.
 
----
+### 2. Application (`/app`)
+* [cite_start]**Build Command:** `docker build -t flask-app ./app`[cite: 33].
+* **Port:** 5000 (Exposed via Gunicorn).
 
-## סקירה
-- **קוד**: Flask + Gunicorn מאזין ל-`0.0.0.0:5000`.
-- **דוקר**: בניית אימג' מהתיקייה `app/` ודחיפה ל-ECR.
-- **Kubernetes/EKS**: Deployment + Service מסוג **LoadBalancer** (שם ה-Service: `alon-app`).
-- **Helm**: צ'ארט יחיד שהוא מקור האמת ל-K8s (`deploy/helm/alon-app`).
-- **CI/CD**: כל `push` ל-`main` מפעיל build→push→helm upgrade.
-- **Monitoring**: kube-prometheus-stack; Grafana נגיש ע"י LoadBalancer (אופציונלי).
+* [cite_start]**Chart:** `devops-alon` version 0.1.0.
+* [cite_start]**Access:** Accessible via AWS LoadBalancer DNS on port 5000[cite: 37].
 
----
-
-## דרישות מוקדמות
-מקומית:
-- Docker
-- kubectl
-- Helm 3
-- AWS CLI מחובר לחשבון (עם הרשאות ל-EKS/ECR)
-- Python 3.11+ (לריצה מקומית בלבד)
-
-בענן:
-- EKS קיים בשם **`devops-alon-eks`** (ברירת מחדל)
-- ECR קיים בשם **`devops-alon-app`**
-- Region: **`eu-central-1`**
+* **FinOps:** Ephemeral infrastructure designed for rapid destruction/re-creation to save costs.
+* **Security:** Use of `.gitignore` to protect state files and IAM least-privilege roles.
+* **Scalability:** Managed Node Groups across multiple subnets.
 
 ---
-
-## איך מריצים מקומית
-```bash
-cd app
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-export PORT=5000
-python main.py
-# בדיקה:
-curl -I http://127.0.0.1:5000/
-
+*Created as per DevOps Technical Assignment requirements.*
